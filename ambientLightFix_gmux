@@ -1,0 +1,125 @@
+#!/bin/bash
+
+max=$(cat /sys/class/backlight/gmux_backlight/max_brightness)
+
+sensitivity=$((max/90))
+
+treshold=$((max/4))
+
+scaleFactor=35
+
+panOut=$((sensitivity/4))
+
+min=$((max/16))
+
+delay=1
+
+sensorsfound=$(ls -d /sys/bus/iio/devices/*iio:device* | wc -l)
+path=/"sys/bus/iio/devices/iio:device0"
+
+for ((c=0; c<sensorsfound; c++))
+do
+	if [ $(ls -Rd 2>/dev/null ${path/0/$c}/*in_illuminance_raw* | wc -l) -eq 1 ]
+	then
+		path="${path/0/$c}/in_illuminance_raw"
+    
+    fi
+done
+
+while [ 1 ]
+
+do
+
+        updated=1
+
+        while [ $updated -gt 0 ]
+
+        do
+
+                updated=0
+
+                backlight=$(cat /sys/class/backlight/gmux_backlight/brightness)
+
+                sensor_raw=$(cat /sys/bus/iio/devices/iio:device0/in_illuminance_raw)
+
+		sensor=$((sensor_raw*sensitivity))
+
+                target=$backlight
+
+
+
+                if [ $sensor -lt $treshold ]
+
+                then
+
+                    sensor=$(((sensor*panOut)+min))
+
+                fi
+
+
+
+
+
+
+
+                if [ $sensor -gt $((backlight+sensitivity)) ]
+
+                then
+
+                        updated=1
+
+                        target=$((target+(sensitivity/2)))
+
+                fi
+
+
+
+
+
+                if [ $sensor -lt $((backlight-sensitivity)) ]
+
+                then
+
+                        updated=1
+
+                        target=$((target-(sensitivity/2)))
+
+                fi
+
+
+
+
+
+                if [ $target -gt $max ]
+
+                then
+
+                        target=$max
+
+                fi
+
+
+
+                if [ $target -lt 1 ]
+
+                then
+
+                        target=$min
+
+                fi
+
+
+
+                if [ $updated -gt 0 ]
+
+                then
+
+                        echo $target > /sys/class/backlight/gmux_backlight/brightness
+
+                fi
+
+        done
+
+        sleep $delay
+
+done
